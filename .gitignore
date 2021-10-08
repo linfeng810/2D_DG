@@ -1,0 +1,5 @@
+*.o
+*.mod
+example/
+*.out
+*.msh
