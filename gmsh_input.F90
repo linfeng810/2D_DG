@@ -68,8 +68,8 @@ module gmsh_input
                     case (8) ! 2D elements (faces)
                         nele = nele + 1
                     case default 
-                        ! print *, 'something is wrong when parsing Elements data, what is being parsed is:'
-                        ! print *, text
+                        print *, 'something is wrong when parsing Elements data, what is being parsed is:'
+                        print *, text
                     end select 
                     ! print*, 'npoints=',npoints, 'nbcface=', nbcface, 'nele=', nele
                 enddo 
@@ -99,7 +99,7 @@ module gmsh_input
                     bfaces(nface)%vertex(1) = element_info(6)
                     bfaces(nface)%vertex(2) = element_info(7)
                     bfaces(nface)%bctype = 1
-                    ! print *, 'bfaces=', bfaces(nface)
+                    ! print *, 'bfaces=', bfaces(nface)%vertex
                 enddo
                 ! 2D elements
                 do ele=1,nele
@@ -131,7 +131,7 @@ module gmsh_input
                     vertices( meshele(ele)%node(inod) )%coor(:)
                     ! this gives us a natural local to global
                     ! map. I guess IC-FERST uses the same way?
-                print*, 'coordinate for global node', (ele-1)*3+inod, 'is' ,meshvertex( (ele-1)*3+inod )%coor
+                ! print*, 'coordinate for global node', (ele-1)*3+inod, 'is' ,meshvertex( (ele-1)*3+inod )%coor
                 
                 ! global edges' nodes 
                     ! (local numbering)
@@ -145,32 +145,40 @@ module gmsh_input
                 if (inod.ne.3) edge_nodes=(/inod, inod+1/)
                 meshface( (ele-1)*3+inod )%vertex(1) = (ele-1)*3+edge_nodes(1)
                 meshface( (ele-1)*3+inod )%vertex(2) = (ele-1)*3+edge_nodes(2)
-                print*, 'global nodes for edge', (ele-1)*3+inod, 'is ', meshface( (ele-1)*3+inod )%vertex
+                meshele( ele )%face(inod) = (ele-1)*3+inod
+                ! print*, 'global nodes for edge', (ele-1)*3+inod, 'is ', meshface( (ele-1)*3+inod )%vertex
 
                 ! is this meshface a boundary face or an interior face?
                 meshface( (ele-1)*3+inod )%bctype=0 ! default: interior face
                 do i = 1,nbcface
+                    ! print *, 'elenode1=', meshele(ele)%node(inod), &
+                    !     'elenode2=', meshele(ele)%node(edge_nodes(2)), &
+                    !     'bfaces nodes=', bfaces(i)%vertex
                     if ( any( meshele(ele)%node(inod) .eq. bfaces(i)%vertex ) .and. &
                         any( meshele(ele)%node(edge_nodes(2)) .eq. bfaces(i)%vertex)) then
                         meshface( (ele-1)*3+inod )%bctype=1 ! is boundary, assuming Dirichlet
                         exit
                     endif
                 enddo
-                print *, 'edge type (bc or not)', meshface( (ele-1)*3+inod )%bctype
+                ! print *, 'edge type (bc or not)', meshface( (ele-1)*3+inod )%bctype
 
                 ! now we find and store neighbor elements to this meshface
                 meshface( (ele-1)*3+inod )%neighbor(1) = ele ! first, this face belongs to 
                     ! its own element. Then we need to find its other neighbor
                 if ( meshface( (ele-1)*3+inod )%bctype.eq.0) then
                     do ele2 = 1,nele
+                        ! print *, 'elenode1=', meshele(ele)%node(inod), &
+                        !     'elenode2=', meshele(ele)%node(edge_nodes(2)), &
+                        !     'ele2 nodes = ', meshele(ele2)%node
                         if (any(meshele(ele)%node(inod) .eq. meshele(ele2)%node) .and. &
-                            any(meshele(ele)%node(edge_nodes(2)) .eq. meshele(ele2)%node)) then
-                            meshface( (ele-1)*3+inod )%neighbor(1) = ele2
+                            any(meshele(ele)%node(edge_nodes(2)) .eq. meshele(ele2)%node) .and. & 
+                            ele .ne. ele2) then
+                            meshface( (ele-1)*3+inod )%neighbor(2) = ele2
                             exit
                         endif
                     enddo
                 endif
-                print *, 'edge neighbor elements are', meshface( (ele-1)*3+inod )%neighbor
+                ! print *, 'edge neighbor elements are', meshface( (ele-1)*3+inod )%neighbor
 
             enddo
         enddo

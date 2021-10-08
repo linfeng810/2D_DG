@@ -9,13 +9,20 @@ program main
     type(face), allocatable::meshface(:)
     type(vertex), allocatable::meshvertex(:)
     character (len=255)::gmsh_filename='example/square.msh'
+    integer :: i
 
     call gmsh_read(gmsh_filename, meshele, meshface, meshvertex)
     open(unit=1, file='output.txt', status='replace')
-    write(1,*) meshele 
+    do i = 1,size(meshele)
+        write(1,*) i, '--', meshele(i)
+    enddo
     write(1,*)
-    write(1,*) meshface 
+    do i = 1,size(meshface)
+        write(1,*) i, '--',  meshface(i)
+    enddo
     write(1,*)
-    write(1,*) meshvertex 
+    do i = 1,size(meshvertex)
+        write(1,*) i, '--', meshvertex(i)
+    enddo
     close(1)
 endprogram
