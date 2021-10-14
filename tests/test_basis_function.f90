@@ -34,5 +34,6 @@ program main
     write(10,*) '  determinant x weight'
     write(10,*) loc_sf%detwei
     
-
+    close(10)
+    
 end program
