@@ -49,7 +49,7 @@ module basis_function
     sf%sfe_funs(:,:,1) = reshape( (/0.5, 0., 0.5, 0.5, 0.5, 0., 0., 0.5, 0.5/) , (/3,3/))
     sf%wei = (/1./)
 
-  endsubroutine
+  end subroutine init_shape_func
 
   subroutine calc_local_shape_func(lsf, sf, lelement, meshvertex)
     type(shape_func_dev), intent(out):: lsf   ! local elements' shape function's derivatives
@@ -58,14 +58,18 @@ module basis_function
     ! type(face), dimension(:), intent(in):: meshface ! all mesh faces => seems useless
     type(vertex), dimension(:), intent(in):: meshvertex ! all mesh vertices
     ! real, dimension(2,3):: ref_coor=(/0.,0.,1.,0.,0.,1./) => seems this is useless.
-    real, dimension(2,3):: x_all
+    real, dimension(2,3):: x_all=0.
     real, dimension(2,2):: jacob, jacobit
     real :: a2
     integer :: inod
 
+    ! print*, 'is input alright?', 'element' , lelement, ' mesh veretex' , meshvertex
+
     ! first we fetech Nodes coordinate in local element
     do inod = 1,3
+      ! print*, 'lelement', lelement
       x_all(:,inod) = meshvertex( lelement%node(inod) )%coor(:)
+      ! print*, 'x_all', x_all
     enddo
 
     ! assuming linear element
@@ -95,7 +99,9 @@ module basis_function
     a2  = (x_all(1,2) - x_all(1,1)) * (x_all(2,3) - x_all(2,1)) &
       - (x_all(1,3) - x_all(1,1)) * (x_all(2,2) - x_all(2,1)) ! = 2A
     ! det * weight (these two alway appears together)
-    lsf%detwei(:) = sf%wei(:) * a2
+    lsf%detwei(:) = sf%wei(:) * abs(a2)
+    ! print*, 'a2', a2
+    ! write(20, *) 'x', x_all
 
     ! calculate J^-T
     ! J
@@ -111,6 +117,8 @@ module basis_function
     jacobit(1,2) = -jacob(1,2)/a2 
     jacobit(2,1) = -jacob(2,1)/a2 
     jacobit(2,2) = jacob(1,1)/a2
+    ! print*, 'jacob', jacob
+    ! print*, 'jacobit', jacobit 
 
     ! calculate J^-T * \nabla N (->on reference element)
     ! \nabla N (->on reference element), for linear element, 
@@ -118,32 +126,34 @@ module basis_function
     lsf%dev_funs(:,1,1) = (/-1.,-1./)
     lsf%dev_funs(:,2,1) = (/1.,0./)
     lsf%dev_funs(:,3,1) = (/0.,1./)
+    ! print*, lsf%dev_funs(:,1,1)
     ! left multiply J^-T to transform to local element
     lsf%dev_funs(:,:,1) = matmul( jacobit , lsf%dev_funs(:,:,1) )
-
-  endsubroutine
+    ! print*, lsf%dev_funs
+  end subroutine calc_local_shape_func
 
   subroutine calc_local_surf_sf(lsf, sf, lface, meshvertex)
     ! this is to calculate shape function value on a surface
-    type(shape_func_dev), intent(out)::lsf 
+    type(shape_func_dev), intent(inout)::lsf 
     type(shape_func), intent(in)::sf
     type(face), intent(in):: lface 
     type(vertex), dimension(:), intent(in):: meshvertex
     real, dimension(2,2):: x_all 
     integer :: inod
-
+    
+    ! print*, 'input inside face', lface
     ! first retrieve coordinates
     x_all(:,1) = meshvertex( (lface%vertex(1)) )%coor(:)
     x_all(:,2) = meshvertex( (lface%vertex(2)) )%coor(:)
-
+    ! print*, x_all, 'sqrt', sqrt( (x_all(1,1)-x_all(1,2))**2 + (x_all(2,1)-x_all(2,2))**2 )
     ! edge length * weight
-    lsf%sdetwei(1) = sqrt( (x_all(2,1)-x_all(1,1))**2 + (x_all(2,2)-x_all(1,2)**2) ) * 1.
-
+    lsf%sdetwei(1) = sqrt( (x_all(1,1)-x_all(1,2))**2 + (x_all(2,1)-x_all(2,2))**2 ) * 1.
+    ! print*, 'edge length',  lsf%sdetwei(1)
     ! 2 derivatives of 3 local nodes shape functions evaluated on 3 edges, 1 gaussian point for each
     do inod = 1,3
       lsf%sdev_funs(:,:,inod,:) = lsf%dev_funs(:,:,:)
     enddo
-  endsubroutine
+  end subroutine calc_local_surf_sf
     
 
 end module
