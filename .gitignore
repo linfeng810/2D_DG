@@ -3,3 +3,5 @@
 example/
 *.out
 *.msh
+*.exe
+fort.*
