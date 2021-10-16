@@ -4,14 +4,42 @@ program main
   ! we will solve a problem with a known analytical solution.
   use mesh_type
   use gmsh_input
-  implicit none
+  use basis_function
+  use assemb_matrix_engine
 
+  implicit none
+  
   ! variable declaration
   type(element), allocatable::meshele(:)
   type(face), allocatable::meshface(:)
   type(vertex), allocatable::meshvertex(:)
   character (len=255)::gmsh_filename='example/square.msh'
-
+  integer::outfileno ! output file unit.
+  
+  real, dimension(:,:), allocatable::bigm 
+  real, dimension(:), allocatable::rhs 
+  integer :: nele, i,j
+  
+  open(newunit=outfileno, file='tests/output.out', status='replace')
+  
   ! read in mesh and create connectivity
   call gmsh_read(gmsh_filename, meshele, meshface, meshvertex)
+  nele = size(meshele)
+  allocate( bigm(nele*3, nele*3) , rhs(nele*3) )
+  bigm= 0.
+  rhs = 0.
+
+  call assemb_matrix(meshele, meshface, meshvertex, bigm, rhs)
+  
+  print*, nele
+
+  do i = 1, nele*3
+    write(outfileno, '(999E24.10)') (bigm(i,j),j=1,nele*3)
+  enddo
+
+  do i = 1,nele*3
+    write(outfileno, *) rhs(i)
+  enddo
+  close(outfileno)
+
 end program
