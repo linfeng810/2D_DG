@@ -12,17 +12,18 @@ program main
   integer :: i
 
   call gmsh_read(gmsh_filename, meshele, meshface, meshvertex)
-  open(unit=1, file='output.txt', status='replace')
+  open(unit=20, file='tests/output.out', status='replace')
   do i = 1,size(meshele)
-    write(1,*) i, '--', meshele(i)
+    write(20,*) i, '--', meshele(i)
   enddo
   write(1,*)
   do i = 1,size(meshface)
-    write(1,*) i, '--',  meshface(i)
+    write(20,*) i, '--',  meshface(i)
   enddo
   write(1,*)
   do i = 1,size(meshvertex)
-    write(1,*) i, '--', meshvertex(i)
+    write(20,*) i, '--', meshvertex(i)
   enddo
-  close(1)
+  close(20)
+  print*, 'complete'
 endprogram
