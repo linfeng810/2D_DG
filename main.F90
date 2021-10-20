@@ -18,7 +18,7 @@ program main
   
   real, dimension(:,:), allocatable::bigm 
   real, dimension(:), allocatable::rhs 
-  integer :: nele, i,j
+  integer :: i,j
   
   open(newunit=outfileno, file='tests/output.out', status='replace')
   

@@ -18,9 +18,9 @@ module gmsh_input
     type(vertex), allocatable, intent(inout)::meshvertex(:) ! to store element nodes, number = 3 * element number
     type(vertex), allocatable::vertices(:)  ! this only stores one copy 
       ! of coordinates at same position. (but there can be multiple nodes)
-    integer :: ierr , i, nnod, idx, ele, ele2, nface, inod
+    integer :: ierr , i,  idx, ele, ele2, nface, inod
     integer :: edge_nodes(2)
-    integer :: nelements=0, npoints=0, nbcface=0, nele=0
+    integer :: nelements=0, npoints=0, nbcface=0
     real, dimension(3) :: coor
     integer, dimension(8):: element_info
     character(len=255) :: text, t, word

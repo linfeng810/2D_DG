@@ -17,7 +17,7 @@ program main
     type(vertex), allocatable::meshvertex(:)
     character (len=255)::gmsh_filename='example/square.msh'
 
-    integer::ele, nele, iface
+    integer::ele, iface
     
     test_ele%node(:) = (/1,2,3/)
     vertices(1)%coor(:) = (/1.5,2.4/)

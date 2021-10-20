@@ -17,4 +17,14 @@ module mesh_type
         integer, dimension(3) :: face 
         integer, dimension(3) :: node
     end type element 
+
+    save
+    ! dimensions
+    integer,parameter :: ngi =3   ! volume quadrature points number
+    integer,parameter :: nsgi=2   ! surface quadrature points number
+    integer,parameter :: ndim=2   ! dimension of the problem
+    integer,parameter :: nloc=3   ! local node number 
+    integer :: nnod     ! total node number 
+    integer :: nele     ! total element number
+
 end module 
