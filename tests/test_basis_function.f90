@@ -17,7 +17,8 @@ program main
     type(vertex), allocatable::meshvertex(:)
     character (len=255)::gmsh_filename='example/square.msh'
 
-    integer::ele, iface
+    integer::ele, iface, inod, jnod, idim
+    real :: nxnx
     
     test_ele%node(:) = (/1,2,3/)
     vertices(1)%coor(:) = (/1.5,2.4/)
@@ -37,31 +38,44 @@ program main
     write(10,*) '  derivatives of basis functions at local element:'
     write(10,*) '  (still, values on Gaussian quadrature point)'
     write(10,*) '   dN1/dx,         dN2/dx,          dN3/dx'
-    write(10,*) loc_sf%dev_funs(1,:,1)
+    write(10,*) loc_sf%dev_funs(1,:,1), loc_sf%dev_funs(1,:,2), loc_sf%dev_funs(1,:,3)
     write(10,*) '   dN1/dy,         dN2/dy,          dN3/dy'
-    write(10,*) loc_sf%dev_funs(2,:,1)
+    write(10,*) loc_sf%dev_funs(2,:,1), loc_sf%dev_funs(2,:,2), loc_sf%dev_funs(2,:,3)
     write(10,*) '  determinant x weight'
     write(10,*) loc_sf%detwei
-    
-    write(10,*) ' ======================= test on square.msh ==========='
-    call gmsh_read(gmsh_filename, meshele, meshface, meshvertex)
-    nele = size(meshele)
-    write(10, *) 'nele=', nele
-    write(10, '(2A12,999A26)') 'ele', 'iface', 'dev_funs111', 'dev_funs121', 'dev_funs131', &
-        'dev_funs211', 'dev_funs221', 'dev_funs231', 'detwei', &
-        'sdx111', 'sdy111', 'sdx211', 'sdy211', 'sdx311', 'sdy311',  &
-        'sdx121', 'sdy121', 'sdx221', 'sdy221', 'sdx321', 'sdy321', &   ! surface derivative x/y of nodal shape function 1/2/3 on face 1/2/3
-        '...', '...', '...', '...', '...', '...', &
-        'sdetwei'
-    do ele = 1,nele
-        print*, 'input ele', ele
-        call calc_local_shape_func(loc_sf, ref_sf, meshele(ele), meshvertex)
-        do iface = 1,3
-            ! print*, 'input outside face', meshface( meshele(ele)%face(iface) )
-            call calc_local_surf_sf(loc_sf, ref_sf, meshface( meshele(ele)%face(iface) ), meshvertex)
-            write(10,'(2I12,999E26.10)') ele, iface, loc_sf 
+    do inod=1,3
+        do jnod=1,3
+            nxnx=0.
+            do idim = 1,2
+                nxnx=nxnx+sum( loc_sf%dev_funs(idim,inod,:)*loc_sf%dev_funs(idim,jnod,:)*loc_sf%detwei(:) )
+            enddo
+            write(10,*) 'i,j,nxnx', inod, jnod, nxnx
         enddo
     enddo
+    
+    ! write(10,*) ' ======================= test on square.msh ==========='
+    ! call gmsh_read(gmsh_filename, meshele, meshface, meshvertex)
+    ! nele = size(meshele)
+    ! write(10, *) 'nele=', nele
+    ! write(10, '(2A12,999A26)') 'ele', 'iface', 'dev_funs111', 'dev_funs121', 'dev_funs131', &
+    !     'dev_funs211', 'dev_funs221', 'dev_funs231', '...', '...', '...',&
+    !     '...', '...', '...','...', '...', '...','...', '...', '...','detwei1', 'detwei2','detwei3',&
+    !     'sdx111', 'sdy111', 'sdx211', 'sdy211', 'sdx311', 'sdy311',  &
+    !     'sdx121', 'sdy121', 'sdx221', 'sdy221', 'sdx321', 'sdy321', &   ! surface derivative x/y of nodal shape function 1/2/3 on face 1/2/3
+    !     '...', '...', '...', '...', '...', '...', &
+    !     '...', '...', '...', '...', '...', '...', &
+    !     '...', '...', '...', '...', '...', '...', &
+    !     '...', '...', '...', '...', '...', '...', &
+    !     'sdetwei1','sdetwei2'
+    ! do ele = 1,nele
+    !     print*, 'input ele', ele
+    !     call calc_local_shape_func(loc_sf, ref_sf, meshele(ele), meshvertex)
+    !     do iface = 1,3
+    !         ! print*, 'input outside face', meshface( meshele(ele)%face(iface) )
+    !         call calc_local_surf_sf(loc_sf, ref_sf, meshface( meshele(ele)%face(iface) ), meshvertex)
+    !         write(10,'(2I12,999F26.5)') ele, iface, loc_sf 
+    !     enddo
+    ! enddo
     write(10, *) 'end'
     close(10)
     

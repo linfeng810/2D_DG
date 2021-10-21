@@ -8,46 +8,57 @@ module basis_function
   implicit none 
 
   type :: shape_func
-    real, dimension(3,1)::fe_funs=0.   ! assuming linear element, 3 local nodes, 1 Gaussian point
-    real, dimension(1)::wei=0. ! Gaussian point weight
-    real, dimension(3,3,1)::sfe_funs=0. ! 3 shape functions evaluated on 3 faces each at 1 Gauss point
-    real, dimension(1)::swei=0. ! surface gaussian poitn weight
+    real, dimension(nloc,ngi)::fe_funs=0.   ! assuming linear element, 3 local nodes, 3 Gaussian point
+    real, dimension(ngi)::wei=0. ! Gaussian point weight
+    real, dimension(nloc,3,nsgi)::sfe_funs=0. ! 3 shape functions evaluated on 3 faces each at 2 Gauss points
+    real, dimension(nsgi)::swei=0. ! surface gaussian poitn weight
   end type
 
   type :: shape_func_dev
-    real, dimension(2,3,1)::dev_funs=0. ! assuming linear element, 2 derivatives, 3 local nodes, 1 
+    real, dimension(ndim,nloc,ngi)::dev_funs=0. ! assuming linear element, 2 derivatives, 3 local nodes, 3 
       ! gaussian point
-    real, dimension(1)::detwei=0. ! determinant (of Jacobian) * Gaussian point weight
-    real, dimension(2,3,3,1)::sdev_funs=0. ! 2 derivatives of 3 local nodes on 3 edges evaluated @ 
+    real, dimension(ngi)::detwei=0. ! determinant (of Jacobian) * Gaussian point weight
+    real, dimension(ndim,nloc,3,nsgi)::sdev_funs=0. ! 2 derivatives of 3 local nodes on 3 edges evaluated @ 
       ! 1 gaussian point
-    real, dimension(1)::sdetwei=0.  ! determinant (edge length) * Gaussian weight
+    real, dimension(nsgi)::sdetwei=0.  ! determinant (edge length) * Gaussian weight
   end type
 
   contains 
   subroutine init_shape_func(sf)
     type(shape_func) , intent(out):: sf 
+    real :: a,b,c
     ! assuming 1st order linear element
-    ! 1 Gaussian point
-    ! gaussian point barycentric coordinate (1/3, 1/3, 1/3)
-    ! shape function in terms of barycentric coorcinate 
-    ! N1 = \zeta, N2 = \xi, N3 =\eta
-    ! where \zeta = 1 - \xi - \eta
-    ! therefore, shape function evaluated at gaussian point is:
-    ! N1 = 1/3, N2 = 1/3, N3 = 1/3
-
-    sf%fe_funs(:,1) = (/1./3.,1./3.,1./3./)
-    sf%wei = (/1./)
-
-    ! N1, N2, N3 evaluated at 3 edges
-    ! (local numbering)
+    ! 3 Gaussian points (mid points of each edge)
+    ! assuming GI poitns has same numbering as edge (shown below)
     !  3
     !  | \
     !  |  \
     !  3   2
     !  |    \
     !  1--1--2
-    sf%sfe_funs(:,:,1) = reshape( (/0.5, 0., 0.5, 0.5, 0.5, 0., 0., 0.5, 0.5/) , (/3,3/))
-    sf%wei = (/1./)
+
+    sf%fe_funs(1,:) = (/.5,0.,.5/); sf%fe_funs(2,:) = (/.5,.5,0./);
+    sf%fe_funs(3,:) = (/0.,.5,.5/)
+    sf%wei = 1./3.
+
+    !======================SUSPECT==============================
+    !=======DO WE REALLY NEED THIS? ++++++++++++++++++++++++++++
+    !=====Yes we do! Only that we need to change to 1D quadrature (surface/face)
+    ! N1, N2, N3 evaluated at 3 edges
+    ! (local numbering) (with edge direction, Gaussian points should be destributed along this direction)
+    !  3
+    !  ^ ┌
+    !  |  \
+    !  3   2
+    !  |    \
+    !  1--1->2
+    ! note that this time we need 1D quadrature, that is 2-point: +- 1/sqrt(3), weight 1
+    ! can take value either (1-1/sqrt(3))/2 or (1+1/sqrt(3))/2 or 0
+    a = (1.-1./sqrt(3.))/2.; b = (1.+1./sqrt(3.))/2.; c = 0.
+    sf%sfe_funs(1,1,:) = (/b,a/);   sf%sfe_funs(1,2,:) = (/c,c/);   sf%sfe_funs(1,3,:) = (/b,a/);
+    sf%sfe_funs(2,1,:) = (/a,b/);   sf%sfe_funs(2,2,:) = (/b,a/);   sf%sfe_funs(2,3,:) = (/c,c/);
+    sf%sfe_funs(3,1,:) = (/c,c/);   sf%sfe_funs(3,2,:) = (/a,b/);   sf%sfe_funs(3,3,:) = (/a,b/);
+    sf%wei = 1./3.
 
   end subroutine init_shape_func
 
@@ -60,13 +71,14 @@ module basis_function
     ! real, dimension(2,3):: ref_coor=(/0.,0.,1.,0.,0.,1./) => seems this is useless.
     real, dimension(2,3):: x_all=0.
     real, dimension(2,2):: jacob, jacobit
+    real, dimension(ndim,nloc,ngi)::ref_sfdev
     real :: a2
-    integer :: inod
+    integer :: inod, gi
 
     ! print*, 'is input alright?', 'element' , lelement, ' mesh veretex' , meshvertex
 
     ! first we fetech Nodes coordinate in local element
-    do inod = 1,3
+    do inod = 1,nloc
       ! print*, 'lelement', lelement
       x_all(:,inod) = meshvertex( lelement%node(inod) )%coor(:)
       ! print*, 'x_all', x_all
@@ -99,7 +111,7 @@ module basis_function
     a2  = (x_all(1,2) - x_all(1,1)) * (x_all(2,3) - x_all(2,1)) &
       - (x_all(1,3) - x_all(1,1)) * (x_all(2,2) - x_all(2,1)) ! = 2A
     ! det * weight (these two alway appears together)
-    lsf%detwei(:) = sf%wei(:) * abs(a2)
+    lsf%detwei(:) = sf%wei(:) * abs(a2)/2.
     ! print*, 'a2', a2
     ! write(20, *) 'x', x_all
 
@@ -121,14 +133,18 @@ module basis_function
     ! print*, 'jacobit', jacobit 
 
     ! calculate J^-T * \nabla N (->on reference element)
-    ! \nabla N (->on reference element), for linear element, 
+    ! \nabla N (->on reference element): for linear element, 
     ! derivatives on reference element is constant
-    lsf%dev_funs(:,1,1) = (/-1.,-1./)
-    lsf%dev_funs(:,2,1) = (/1.,0./)
-    lsf%dev_funs(:,3,1) = (/0.,1./)
+    do gi = 1,ngi
+      ref_sfdev(:,1,gi) = (/-1.,-1./)
+      ref_sfdev(:,2,gi) = (/1.,0./)
+      ref_sfdev(:,3,gi) = (/0.,1./)
+    enddo
     ! print*, lsf%dev_funs(:,1,1)
     ! left multiply J^-T to transform to local element
-    lsf%dev_funs(:,:,1) = matmul( jacobit , lsf%dev_funs(:,:,1) )
+    do gi = 1,ngi
+      lsf%dev_funs(:,:,gi) = matmul( jacobit , ref_sfdev(:,:,gi) )
+    enddo
     ! print*, lsf%dev_funs
   end subroutine calc_local_shape_func
 
@@ -139,7 +155,7 @@ module basis_function
     type(face), intent(in):: lface 
     type(vertex), dimension(:), intent(in):: meshvertex
     real, dimension(2,2):: x_all 
-    integer :: inod
+    integer :: iface
     
     ! print*, 'input inside face', lface
     ! first retrieve coordinates
@@ -147,11 +163,15 @@ module basis_function
     x_all(:,2) = meshvertex( (lface%vertex(2)) )%coor(:)
     ! print*, x_all, 'sqrt', sqrt( (x_all(1,1)-x_all(1,2))**2 + (x_all(2,1)-x_all(2,2))**2 )
     ! edge length * weight
-    lsf%sdetwei(1) = sqrt( (x_all(1,1)-x_all(1,2))**2 + (x_all(2,1)-x_all(2,2))**2 ) * 1.
+    lsf%sdetwei = sqrt( (x_all(1,1)-x_all(1,2))**2 + (x_all(2,1)-x_all(2,2))**2 ) * 1. /2.
     ! print*, 'edge length',  lsf%sdetwei(1)
-    ! 2 derivatives of 3 local nodes shape functions evaluated on 3 edges, 1 gaussian point for each
-    do inod = 1,3
-      lsf%sdev_funs(:,:,inod,:) = lsf%dev_funs(:,:,:)
+    ! 2 derivatives of 3 local nodes shape functions evaluated on 3 edges, 2 gaussian point for each
+    do iface = 1,3
+      ! print*, lsf%sdev_funs(:,:,iface,:)
+      ! print*, lsf%dev_funs(:,:,:)
+      lsf%sdev_funs(:,:,iface,:) = lsf%dev_funs(:,:,1:2)  ! because derivative is constant, 
+          ! we take a short cut and applies its value at (2D) quadrature points 
+          ! to (1D) quadrature points on edges
     enddo
   end subroutine calc_local_surf_sf
     
