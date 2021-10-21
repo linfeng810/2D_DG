@@ -8,23 +8,23 @@ test: type_declaration.o basis_function.o gmsh_input.o assemble_matrix.o dirlnso
 		dirlnsol.o -o test_solver.exe
 
 dg_2d: type_declaration.o basis_function.o gmsh_input.o assemble_matrix.o dirlnsol.o
-	gfortran -g -fcheck=all -Wall -ffpe-trap=invalid,zero,overflow main.f90 \
+	gfortran -g -fcheck=all -Wall -ffpe-trap=invalid,zero,overflow main.F90 \
 		type_declaration.o basis_function.o gmsh_input.o  assemble_matrix.o dirlnsol.o\
 		-o dg_2d.exe -static
 
 dg_2d_debug: type_declaration.o basis_function.o gmsh_input.o assemble_matrix.o dirlnsol.o
-	gfortran -g -fcheck=all -Wall -ffpe-trap=invalid,zero,overflow main.f90 \
+	gfortran -g -fcheck=all -Wall -ffpe-trap=invalid,zero,overflow main.F90 \
 		type_declaration.o basis_function.o gmsh_input.o  assemble_matrix.o dirlnsol.o\
 		-o dg_2d.exe
 
-type_declaration.o: type_declaration.f90 
-	gfortran -g -fcheck=all -Wall -ffpe-trap=invalid,zero,overflow -c type_declaration.f90 
+type_declaration.o: type_declaration.F90 
+	gfortran -g -fcheck=all -Wall -ffpe-trap=invalid,zero,overflow -c type_declaration.F90 
 
 basis_function.o: basis_function.f90 
 	gfortran -g -fcheck=all -Wall -ffpe-trap=invalid,zero,overflow -c basis_function.f90 
 
-gmsh_input.o: gmsh_input.f90 
-	gfortran -g -fcheck=all -Wall -ffpe-trap=invalid,zero,overflow -c gmsh_input.f90 
+gmsh_input.o: gmsh_input.F90 
+	gfortran -g -fcheck=all -Wall -ffpe-trap=invalid,zero,overflow -c gmsh_input.F90 
 
 assemble_matrix.o: assemble_matrix.f90 
 	gfortran -g -fcheck=all -Wall -ffpe-trap=invalid,zero,overflow -c assemble_matrix.f90

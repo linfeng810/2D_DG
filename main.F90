@@ -14,7 +14,7 @@ program main
   type(element), allocatable::meshele(:)
   type(face), allocatable::meshface(:)
   type(vertex), allocatable::meshvertex(:)
-  character (len=255)::gmsh_filename='example/square.msh'
+  character (len=255)::gmsh_filename='example/square_fine.msh'
   integer::outfileno ! output file unit.
   
   real, dimension(:,:), allocatable::bigm 
@@ -38,16 +38,16 @@ program main
   
   print*, nele
 
-  do i = 1, nele*3
-    write(outfileno, '(999E24.10)') (bigm(i,j),j=1,nele*3)
-  enddo
-  write(outfileno, *)
-  do i = 1,nele*3
-    write(outfileno, *) rhs(i)
-  enddo
+  ! do i = 1, nele*3
+  !   write(outfileno, '(999E24.10)') (bigm(i,j),j=1,nele*3)
+  ! enddo
+  ! write(outfileno, *)
+  ! do i = 1,nele*3
+  !   write(outfileno, *) rhs(i)
+  ! enddo
   write(outfileno, *) 'nnod=', nnod
   do i = 1,nnod 
-    write(outfileno, *) phi(i)
+    write(outfileno, *) meshvertex(i)%coor, phi(i)
   enddo
   close(outfileno)
 

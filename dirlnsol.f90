@@ -45,18 +45,18 @@ module mod_solve
       u(n,n) = u(n,n) - l(n,k) * u(k,n)
     enddo
     
-    write(*,*) 'A is' 
-    do i = 1,n
-      write(*,*) (a(i,j), j=1,n)
-    enddo
-    write(*,*) 'u is' 
-    do i = 1,n
-      write(*,*) (u(i,j), j=1,n)
-    enddo
-    write(*,*) 'l is' 
-    do i = 1,n
-      write(*,*) (l(i,j), j=1,n)
-    enddo
+    ! write(*,*) 'A is' 
+    ! do i = 1,n
+    !   write(*,*) (a(i,j), j=1,n)
+    ! enddo
+    ! write(*,*) 'u is' 
+    ! do i = 1,n
+    !   write(*,*) (u(i,j), j=1,n)
+    ! enddo
+    ! write(*,*) 'l is' 
+    ! do i = 1,n
+    !   write(*,*) (l(i,j), j=1,n)
+    ! enddo
     
     ! solving Ax=b by Ux=y, Ly=b
     y(1) = b(1)
