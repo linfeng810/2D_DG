@@ -6,6 +6,7 @@ program main
   use gmsh_input
   use basis_function
   use assemb_matrix_engine
+  use mod_solve
 
   implicit none
   
@@ -17,7 +18,7 @@ program main
   integer::outfileno ! output file unit.
   
   real, dimension(:,:), allocatable::bigm 
-  real, dimension(:), allocatable::rhs 
+  real, dimension(:), allocatable::rhs , phi
   integer :: i,j
   
   open(newunit=outfileno, file='tests/output.out', status='replace')
@@ -25,20 +26,28 @@ program main
   ! read in mesh and create connectivity
   call gmsh_read(gmsh_filename, meshele, meshface, meshvertex)
   nele = size(meshele)
-  allocate( bigm(nele*3, nele*3) , rhs(nele*3) )
+  nnod = 3*nele
+  allocate( bigm(nele*3, nele*3) , rhs(nele*3) , phi(nele*3) )
   bigm= 0.
   rhs = 0.
+  phi = 0.
 
   call assemb_matrix(meshele, meshface, meshvertex, bigm, rhs)
+
+  call lusolve(bigm,rhs,phi,nnod)
   
   print*, nele
 
   do i = 1, nele*3
     write(outfileno, '(999E24.10)') (bigm(i,j),j=1,nele*3)
   enddo
-
+  write(outfileno, *)
   do i = 1,nele*3
     write(outfileno, *) rhs(i)
+  enddo
+  write(outfileno, *) 'nnod=', nnod
+  do i = 1,nnod 
+    write(outfileno, *) phi(i)
   enddo
   close(outfileno)
 
