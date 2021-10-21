@@ -125,6 +125,7 @@ module assemb_matrix_engine
                 ! \nabla P1.n_e.n1
                 nnx = nnx + sum( sf%sfe_funs(inod,iface, :) * sf_dev%sdev_funs(idim, jnod, iface, :) &
                      * sf_dev%sdetwei(:) ) * normal(idim) 
+                ! print*, 'sdev_funs', sf_dev%sdev_funs(idim, jnod, iface, :)
                 ! \nabla n1.n_e.P1
                 nxn = nxn + sum( sf_dev%sdev_funs(idim, inod, iface, :) * sf%sfe_funs(jnod,iface, :) & 
                      * sf_dev%sdetwei(:) ) * normal(idim)
@@ -134,8 +135,8 @@ module assemb_matrix_engine
               bigm(glob_i, glob_j) = bigm(glob_i, glob_j) &
                 - 0.5 *nnx + 0.5 * epsilon * nxn & 
                 + sigma/(elength**beta) * nn 
-              print*, 'nnx', nnx, 'nxn', nxn, 'elenght', elength, 'nn', nn
-              print*,  'ele', ele, 'glob_i', glob_i, 'glob_j', glob_j, 'bigm', bigm(glob_i, glob_j)
+              ! print*, 'nnx', nnx, 'nxn', nxn, 'elenght', elength, 'nn', nn
+              ! print*,  'ele', ele, 'glob_i', glob_i, 'glob_j', glob_j, 'bigm', bigm(glob_i, glob_j)
             enddo
           enddo
           ! contribution m22
