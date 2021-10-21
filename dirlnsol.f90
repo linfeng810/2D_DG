@@ -11,7 +11,7 @@ module mod_solve
     real, intent(out)::x(n)
     real :: l(n,n), u(n,n)
     integer :: i, j, k
-    integer :: y(n)
+    real :: y(n)
     
     ! do LU decomposition and stores in l & u respectively
     do j = 1,n
