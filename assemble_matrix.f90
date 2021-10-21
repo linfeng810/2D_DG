@@ -14,13 +14,13 @@ module assemb_matrix_engine
     real, dimension(:,:), intent(inout) :: bigm ! lhs matrix, declared out side 
       ! this scope and passed in here.
     real, dimension(:), intent(inout) :: rhs ! rhs vector, :
-    integer :: ele, nele, iface, inod, jnod, nnod=3, &
+    integer :: ele, iface, inod, jnod, &
                glob_i, glob_j, idim, glob_iface, ele2,  third_nod
     real :: normal(2) ! normal vector
     real :: nn, nnx, nxn, nxnx, ml ! ml is local mass?
     real, dimension(2,3) :: x_all ! nodes coordinate
     real :: elength ! edge length
-    real, parameter :: K(2,2) = reshape((/1.0,0.0,0.0,1.0/) , (/2,2/)), &  ! diffusion coefficient
+    real, parameter :: K(2,2) = reshape((/1.0,0.0,0.0,1.0/) , (/ndim,ndim/)), &  ! diffusion coefficient
         alpha = 0.  ,  &    ! reaction term in govering equation
         beta = 1.   ,  &    ! J0 term: 1 - w/o superpenalization; >1 - w/ superpenalization.
         sigma = 1.  ,  &    ! J0 term
@@ -42,19 +42,19 @@ module assemb_matrix_engine
       call calc_local_shape_func(sf_dev, sf, meshele(ele), meshvertex)
       ! write(20, *) 'ele=', ele, 'sf_dev = ', sf_dev
       ! local node cycle
-      do inod = 1,3
+      do inod = 1,nloc
         ! global node number
         glob_i = (ele-1)*3 + inod 
         ! \sum_j (Ni Nj) -> this is used in rhs f
         ml = 0.
         ! local node cycle 2
-        do jnod = 1,3 
+        do jnod = 1,nloc
           ! to store local \nabla Ni \cdot \nabla Nj
           nxnx = 0.
           ! global node number
           glob_j = (ele-1)*3 + jnod 
           ! dot product of divergence
-          do idim = 1,2
+          do idim = 1,ndim
             nxnx = nxnx + sum( sf_dev%dev_funs(idim, inod, :) * sf_dev%dev_funs(idim, jnod, :) & 
               * sf_dev%detwei(:) )
               ! write(20,*) 'nxnx', nxnx
@@ -62,17 +62,18 @@ module assemb_matrix_engine
           enddo
           ! mass matrix Ni Nj
           nn = sum( sf%fe_funs(inod,:) * sf%fe_funs(jnod,:) * sf_dev%detwei(:) )
+          ! print*, inod, jnod, glob_i, glob_j, nn
           ml = ml + nn
           ! contribution A = K \nabla Ni \cdot \nabla Nj + \alpha Ni Nj
           bigm(glob_i, glob_j) = bigm(glob_i, glob_j) + nxnx + nn * alpha
-          ! print*,  'ele', ele, 'glob_i', glob_i, 'glob_j', glob_j, 'bigm', bigm(glob_i, glob_j)
+          ! print*,  'ele', ele, 'glob_i', glob_i, 'glob_j', glob_j, 'bigm', bigm(glob_i, glob_j), 'nxnx' , nxnx
           ! print*, 'nxnx, nn, ml', nxnx, nn, ml
 
           ! here we didn't use a direct local coordinate to evaluate right hand side term f
           ! (as used in Rivere's book), but instead we use a shape function interpolation.
           ! this is because practically we will only give right hand side f value on each 
           ! node.
-          rhs(glob_i) = rhs(glob_i) + nn * f3( meshvertex(glob_j)%coor(1) , meshvertex(glob_j)%coor(2) )
+          rhs(glob_i) = rhs(glob_i) + nn * f1( meshvertex(glob_j)%coor(1) , meshvertex(glob_j)%coor(2) )
           ! print*, 'ele, inod, rhs, f1', ele, inod, rhs(glob_i), f1( meshvertex(glob_j)%coor(1) , meshvertex(glob_j)%coor(2) )
         enddo
       enddo
@@ -81,7 +82,7 @@ module assemb_matrix_engine
       ! ! element cycle
       ! do ele = 1, nele 
       ! face cycle
-      do iface = 1,3
+      do iface = 1,nloc
         glob_iface = meshele(ele)%face(iface)
         if (meshface(glob_iface)%bctype .eq. 0) then ! not boundary face
           ! element index on other sides of the face
@@ -114,13 +115,13 @@ module assemb_matrix_engine
 
           ! start assembling
           ! contribution m11
-          do inod = 1,nnod
+          do inod = 1,nloc
             glob_i = (ele-1)*3 + inod 
-            do jnod = 1,nnod
+            do jnod = 1,nloc
               glob_j = (ele-1)*3 + jnod 
               nnx=0.
               nxn=0.
-              do idim = 1,2
+              do idim = 1,ndim
                 ! \nabla P1.n_e.n1
                 nnx = nnx + sum( sf%sfe_funs(inod,iface, :) * sf_dev%sdev_funs(idim, jnod, iface, :) &
                      * sf_dev%sdetwei(:) ) * normal(idim) 
@@ -133,18 +134,18 @@ module assemb_matrix_engine
               bigm(glob_i, glob_j) = bigm(glob_i, glob_j) &
                 - 0.5 *nnx + 0.5 * epsilon * nxn & 
                 + sigma/(elength**beta) * nn 
-              ! print*, 'nnx', nnx, 'nxn', nxn, 'elenght', elength, 'nn', nn
-              ! print*,  'ele', ele, 'glob_i', glob_i, 'glob_j', glob_j, 'bigm', bigm(glob_i, glob_j)
+              print*, 'nnx', nnx, 'nxn', nxn, 'elenght', elength, 'nn', nn
+              print*,  'ele', ele, 'glob_i', glob_i, 'glob_j', glob_j, 'bigm', bigm(glob_i, glob_j)
             enddo
           enddo
           ! contribution m22
-          do inod = 1,nnod
+          do inod = 1,nloc
             glob_i = (ele2-1)*3 + inod 
-            do jnod = 1,nnod
+            do jnod = 1,nloc
               glob_j = (ele2-1)*3 + jnod 
               nnx=0.
               nxn=0.
-              do idim = 1,2
+              do idim = 1,ndim
                 ! \nabla P2.n_e.n2
                 nnx = nnx + sum( sf%sfe_funs(inod,iface, :) * sf_dev2%sdev_funs(idim, jnod, iface, :) &
                      * sf_dev2%sdetwei(:) ) * normal(idim) 
@@ -160,13 +161,13 @@ module assemb_matrix_engine
             enddo
           enddo
           ! contribution m12
-          do inod = 1,nnod
+          do inod = 1,nloc
             glob_i = (ele-1)*3 + inod 
-            do jnod = 1,nnod
+            do jnod = 1,nloc
               glob_j = (ele2-1)*3 + jnod 
               nnx=0.
               nxn=0.
-              do idim = 1,2
+              do idim = 1,ndim
                 ! \nabla P2.n_e.n1
                 nnx = nnx + sum( sf%sfe_funs(inod,iface, :) * sf_dev2%sdev_funs(idim, jnod, iface, :) &
                      * sf_dev2%sdetwei(:) ) * normal(idim) 
@@ -184,13 +185,13 @@ module assemb_matrix_engine
             enddo
           enddo
           ! contribution m21
-          do inod = 1,nnod
+          do inod = 1,nloc
             glob_i = (ele2-1)*3 + inod 
-            do jnod = 1,nnod
+            do jnod = 1,nloc
               glob_j = (ele-1)*3 + jnod 
               nnx=0.
               nxn=0.
-              do idim = 1,2
+              do idim = 1,ndim
                 ! \nabla P1.n_e.n2
                 nnx = nnx + sum( sf%sfe_funs(inod,iface, :) * sf_dev%sdev_funs(idim, jnod, iface, :) &
                      * sf_dev%sdetwei(:) ) * normal(idim) 
@@ -209,13 +210,13 @@ module assemb_matrix_engine
           ! calculate derivatives @ edges (suspicious! watch out TODO)
           call calc_local_surf_sf(sf_dev, sf, meshface(glob_iface), meshvertex)
           ! only m11 contribution
-          do inod = 1,nnod
+          do inod = 1,nloc
             glob_i = (ele-1)*3 + inod 
-            do jnod = 1,nnod
+            do jnod = 1,nloc
               glob_j = (ele-1)*3 + jnod 
               nnx=0.
               nxn=0.
-              do idim = 1,2
+              do idim = 1,ndim
                 ! \nabla P1.n_e.n1
                 nnx = nnx + sum( sf%sfe_funs(inod,iface, :) * sf_dev%sdev_funs(idim, jnod, iface, :) &
                      * sf_dev%sdetwei(:) ) * normal(idim) 
@@ -235,11 +236,12 @@ module assemb_matrix_engine
           enddo
           
         elseif( meshface(glob_iface)%bctype .eq. 2) then ! Neumann boundary face
+          print*, 'Caution: You are using Neumann boundary conditions now. Please check if the code is correctly implemented.' 
           ! to be tested... (because we don't mark meshface%bctype with 2 now)
           call calc_local_surf_sf(sf_dev, sf, meshface(glob_iface), meshvertex)
-          do inod = 1,nnod 
+          do inod = 1,nloc 
             glob_i = (ele-1)*3 + inod 
-            do jnod = 1,nnod 
+            do jnod = 1,nloc 
               glob_j = (ele-1)*3 + jnod 
               nn = sum( sf%sfe_funs(inod, iface, :) * sf%sfe_funs(jnod, iface, :) * sf_dev%sdetwei(:) )
               ! when actually use this, change g_N to the desired BC function.
@@ -270,13 +272,13 @@ module assemb_matrix_engine
 
   real function f3(x,y) result(f)
     real, intent(in):: x,y
-    f = 1.
+    f = 0.
   end function
 
   real function g_D(x,y) result(g)
     real, intent(in):: x, y
     ! g = exp(-x-y**2) ! for f1
     ! g = x*(x-1)*y*(y-1)*exp(-x**2-y**2) ! for f2
-    g =01. ! for f3
+    g =1. ! for f3
   end function
 end module
