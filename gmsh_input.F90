@@ -33,6 +33,10 @@ module gmsh_input
     ! 2. boundary edge and nodes associated with it 
     !    (in the future we can use physical id to indentify different bc types)
     ! 3. element and nodes associated with it
+    ! then we enrich mesh info:
+    ! 4. create local nodes and faces, find neighbouring elements, faces, and nodes
+    ! 5. reordering nodes numbering
+    ! Step 1: ===================================================================
     do  
       ! this find string snippet is from:
       ! https://stackoverflow.com/questions/29125581/fortran-find-string-in-txt-file
@@ -87,6 +91,7 @@ module gmsh_input
 
     allocate(bfaces(nbcface), meshele(nele)) 
 
+    ! Step 2&3: ==========================================================================
     rewind (mesh_file_unit) ! go back and read again to store node info associated with 
           ! points, edges, and faces.
     do  
@@ -131,6 +136,7 @@ module gmsh_input
     enddo
     close(mesh_file_unit) ! gmsh file no longer has useful info for us.
 
+    ! Step 4: =============================================================================
     ! now we are going to build edges and ... vertices actually. (DG)
     allocate(meshvertex(nele*3), meshface(nele*3)) ! every 2D element 
       ! has 3 vertices and 3 faces
@@ -218,7 +224,7 @@ module gmsh_input
 
               ! print*, 'ele', ele, 'ele2', ele2, 'node', meshface((ele-1)*3+iface)%vertex, &
               !   'nbnode', meshface( (ele-1)*3 + iface)%nb_node
-              
+              ! print*, 'ele', ele, 'ele2', ele2, 'iface', iface, 'iface2', meshface((ele-1)*3+iface)%nb_iface
 
               exit ! do ele2
 
@@ -230,6 +236,7 @@ module gmsh_input
       enddo
     enddo
 
+    ! Step 5: ===========================================================================
     ! after all, change element node numbering to DG global numbering
     do ele=1,nele 
       do inod = 1,3
