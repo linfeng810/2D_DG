@@ -47,17 +47,17 @@ module basis_function
     ! N1, N2, N3 evaluated at 3 edges
     ! (local numbering) (with edge direction, Gaussian points should be destributed along this direction)
     !  3
-    !  ^ ┌
+    !  | ┌
     !  |  \
     !  3   2
-    !  |    \
+    !  v    \
     !  1--1->2
     ! note that this time we need 1D quadrature, that is 2-point: +- 1/sqrt(3), weight 1
     ! can take value either (1-1/sqrt(3))/2 or (1+1/sqrt(3))/2 or 0
     a = (1.-1./sqrt(3.))/2.; b = (1.+1./sqrt(3.))/2.; c = 0.
-    sf%sfe_funs(1,1,:) = (/b,a/);   sf%sfe_funs(1,2,:) = (/c,c/);   sf%sfe_funs(1,3,:) = (/b,a/);
+    sf%sfe_funs(1,1,:) = (/b,a/);   sf%sfe_funs(1,2,:) = (/c,c/);   sf%sfe_funs(1,3,:) = (/a,b/);
     sf%sfe_funs(2,1,:) = (/a,b/);   sf%sfe_funs(2,2,:) = (/b,a/);   sf%sfe_funs(2,3,:) = (/c,c/);
-    sf%sfe_funs(3,1,:) = (/c,c/);   sf%sfe_funs(3,2,:) = (/a,b/);   sf%sfe_funs(3,3,:) = (/a,b/);
+    sf%sfe_funs(3,1,:) = (/c,c/);   sf%sfe_funs(3,2,:) = (/a,b/);   sf%sfe_funs(3,3,:) = (/b,a/);
     sf%wei = 1./3.
 
   end subroutine init_shape_func
