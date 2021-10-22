@@ -18,7 +18,7 @@ module gmsh_input
     type(vertex), allocatable, intent(inout)::meshvertex(:) ! to store element nodes, number = 3 * element number
     type(vertex), allocatable::vertices(:)  ! this only stores one copy 
       ! of coordinates at same position. (but there can be multiple nodes)
-    integer :: ierr , i,  idx, ele, ele2, nface, inod
+    integer :: ierr , i,  idx, ele, ele2, nface, inod, iface
     integer :: edge_nodes(2)
     integer :: nelements=0, npoints=0, nbcface=0
     real, dimension(3) :: coor
@@ -145,7 +145,9 @@ module gmsh_input
         ! meshele(ele)%node(inod) = (ele-1)*3+inod ! change element node numbering to DG global numbering
           ! can't do it here because we need this information to find neighbor element!
         ! print*, 'coordinate for global node', (ele-1)*3+inod, 'is' ,meshvertex( (ele-1)*3+inod )%coor
-        
+      enddo
+
+      do iface=1,3
         ! global edges' nodes 
           ! (local numbering)
           !  3
@@ -154,43 +156,75 @@ module gmsh_input
           !  3   2
           !  |    \
           !  1--1--2
-        if (inod.eq.3) edge_nodes=(/3,1/)
-        if (inod.ne.3) edge_nodes=(/inod, inod+1/)
-        meshface( (ele-1)*3+inod )%vertex(1) = (ele-1)*3+edge_nodes(1)
-        meshface( (ele-1)*3+inod )%vertex(2) = (ele-1)*3+edge_nodes(2)
-        meshele( ele )%face(inod) = (ele-1)*3+inod
-        ! print*, 'global nodes for edge', (ele-1)*3+inod, 'is ', meshface( (ele-1)*3+inod )%vertex
+        if (iface.eq.3) edge_nodes=(/3,1/)
+        if (iface.ne.3) edge_nodes=(/iface, iface+1/)
+        meshface( (ele-1)*3+iface )%vertex(1) = (ele-1)*3+edge_nodes(1)
+        meshface( (ele-1)*3+iface )%vertex(2) = (ele-1)*3+edge_nodes(2)
+        meshele( ele )%face(iface) = (ele-1)*3+iface
+        meshface( (ele-1)*3+iface )%lc_vertex = edge_nodes
 
         ! is this meshface a boundary face or an interior face?
-        meshface( (ele-1)*3+inod )%bctype=0 ! default: interior face
+        meshface( (ele-1)*3+iface )%bctype=0 ! default: interior face
         do i = 1,nbcface
-          ! print *, 'elenode1=', meshele(ele)%node(inod), &
-          !   'elenode2=', meshele(ele)%node(edge_nodes(2)), &
-          !   'bfaces nodes=', bfaces(i)%vertex
-          if ( any( meshele(ele)%node(inod) .eq. bfaces(i)%vertex ) .and. &
+          if ( any( meshele(ele)%node(edge_nodes(1)) .eq. bfaces(i)%vertex ) .and. &
             any( meshele(ele)%node(edge_nodes(2)) .eq. bfaces(i)%vertex)) then
-            meshface( (ele-1)*3+inod )%bctype=1 ! is boundary, assuming Dirichlet
+            meshface( (ele-1)*3+iface )%bctype=1 ! is boundary, assuming Dirichlet
             exit
           endif
         enddo
-        ! print *, 'edge type (bc or not)', meshface( (ele-1)*3+inod )%bctype
 
         ! now we find and store neighbor elements to this meshface
-        meshface( (ele-1)*3+inod )%neighbor(1) = ele ! first, this face belongs to 
+        meshface( (ele-1)*3+iface )%neighbor(1) = ele ! first, this face belongs to 
           ! its own element. Then we need to find its other neighbor
-        if ( meshface( (ele-1)*3+inod )%bctype.eq.0) then
+        if ( meshface( (ele-1)*3+iface )%bctype.eq.0) then
           do ele2 = 1,nele
-            ! print *, 'elenode1=', meshele(ele)%node(inod), &
-            !   'elenode2=', meshele(ele)%node(edge_nodes(2)), &
-            !   'ele2 nodes = ', meshele(ele2)%node
-            if (any(meshele(ele)%node(inod) .eq. meshele(ele2)%node) .and. &
+            if (any(meshele(ele)%node(edge_nodes(1)) .eq. meshele(ele2)%node) .and. &
               any(meshele(ele)%node(edge_nodes(2)) .eq. meshele(ele2)%node) .and. & 
               ele .ne. ele2) then
-              meshface( (ele-1)*3+inod )%neighbor(2) = ele2
-              exit
-            endif
-          enddo
-        endif
+              ! found neighbouring element
+                meshface( (ele-1)*3+iface )%neighbor(2) = ele2
+              ! find neighbouring node to first edge node
+              do inod = 1,nloc 
+                ! print*,  meshele(ele)%node(edge_nodes(1)), meshele(ele2)%node(inod)
+                if ( meshele(ele)%node(edge_nodes(1)) .eq. meshele(ele2)%node(inod) ) then
+                  ! print*, 'I got in!'
+                  meshface( (ele-1)*3+iface )%nb_node(1) = (ele2-1)*3+inod 
+                  exit 
+                endif
+              enddo
+              ! find neighbouring node to 2nd edge node
+              do inod = 1,nloc 
+                if ( meshele(ele)%node(edge_nodes(2)) .eq. meshele(ele2)%node(inod) ) then 
+                  meshface( (ele-1)*3+iface )%nb_node(2) = (ele2-1)*3+inod 
+                  exit 
+                endif
+              enddo
+              
+              ! now find local index of this neighbouring face
+              ! mod( nb_node(1) + nb_node(2) , 3) = 0 ..... local node 1&2 local face 1
+              !                                   = 1 ..... local node 1&3 local face 3
+              !                                   = 2 ..... local node 2&3 local face 2
+              select case ( mod ( sum(meshface( (ele-1)*3+iface )%nb_node) , 3 ) )
+              case(0)
+                meshface( (ele-1)*3 + iface )%nb_iface=1
+              case(1)
+                meshface( (ele-1)*3 + iface )%nb_iface=3
+              case(2)
+                meshface( (ele-1)*3 + iface )%nb_iface=2
+              case default 
+                print*, 'in sbrt gmsh_read: something is wrong ', & 
+                  'when finding local index of neighbouring face.'
+              end select
+
+              ! print*, 'ele', ele, 'ele2', ele2, 'node', meshface((ele-1)*3+iface)%vertex, &
+              !   'nbnode', meshface( (ele-1)*3 + iface)%nb_node
+              
+
+              exit ! do ele2
+
+            endif ! ele.node == ele2.node ??
+          enddo ! do ele2
+        endif ! bctype .eq. 0 ??
         ! print *, 'edge neighbor elements are', meshface( (ele-1)*3+inod )%neighbor
 
       enddo
