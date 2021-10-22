@@ -14,8 +14,10 @@ module assemb_matrix_engine
     real, dimension(:,:), intent(inout) :: bigm ! lhs matrix, declared out side 
       ! this scope and passed in here.
     real, dimension(:), intent(inout) :: rhs ! rhs vector, :
-    integer :: ele, iface, inod, jnod, &
-               glob_i, glob_j, idim, glob_iface, ele2,  third_nod
+    integer :: ele, iface, iface2, inod, jnod, &
+               glob_i, glob_j, idim, glob_iface,glob_iface2, &
+               ele2,  third_nod, gi 
+    logical :: sgi_order_same
     real :: normal(2) ! normal vector
     real :: nn, nnx, nxn, nxnx, ml ! ml is local mass?
     real, dimension(2,3) :: x_all ! nodes coordinate
@@ -30,8 +32,8 @@ module assemb_matrix_engine
     type(shape_func) :: sf 
     type(shape_func_dev) :: sf_dev, sf_dev2 ! neighbour element shape function derivatives
 
-    ! total number of elements
-    nele=size(meshele)
+    ! total number of elements ===> no need to do this since nele is stored in mesh_type module and defined after reading mesh
+    ! nele=size(meshele)
     ! print*, 'nele', nele
 
     call init_shape_func(sf)
@@ -87,6 +89,12 @@ module assemb_matrix_engine
         if (meshface(glob_iface)%bctype .eq. 0) then ! not boundary face
           ! element index on other sides of the face
           ele2 = meshface(glob_iface)%neighbor(2)
+          ! face info on the other side
+          iface2 = meshface(glob_iface)%nb_iface
+          glob_iface2 = meshele(ele)%face(iface2)
+          ! are gaussian point distribution in same order for two sides?
+          sgi_order_same = all(meshvertex(meshface(glob_iface)%vertex(1))%coor & 
+              .eq. meshvertex(meshface(glob_iface2)%vertex(1))%coor) 
           ! print*, 'ele', ele, 'glob_iface', glob_iface, 'ele2',  ele2
           call calc_local_shape_func(sf_dev2, sf, meshele(ele2), meshvertex)
           ! calculate derivatives @ edges (suspicious! watch out TODO)
@@ -104,7 +112,7 @@ module assemb_matrix_engine
           normal(1) = (x_all(2,1) - x_all(2,2)) / elength ! (y1-y2)/e
           normal(2) = (x_all(1,2) - x_all(1,1)) / elength ! (x2-x1)/e
           ! is this the outer normal?
-          ! n * (V31) < 0 then outer; or inner
+          ! n * (V31) < 0 then outer; otherwise inner
           if ( normal(1)*(x_all(1,3)-x_all(1,1)) + normal(2)*(x_all(2,3)-x_all(2,1)) .lt. 0. ) then 
             ! do nothing
           else
@@ -112,6 +120,7 @@ module assemb_matrix_engine
             normal(2) = - normal(2)
           endif
           ! print*,  'ele fac enormal ', ele , iface, normal(1), normal(2) ! pass review!
+          ! print*, elength, sf_dev%sdetwei(:), sf_dev2%sdetwei(:)
 
           ! start assembling
           ! contribution m11
@@ -161,6 +170,10 @@ module assemb_matrix_engine
                 + sigma/(elength**beta) * nn 
             enddo
           enddo
+
+          ! now surface term across elements.
+          ! in m12 and m21 we need neighbouring face local index (iface2) to correctly use sf%sfe_funs.
+          ! we also need to know if gaussian points distribution is the same on both sides (sgi_order_same)
           ! contribution m12
           do inod = 1,nloc
             glob_i = (ele-1)*3 + inod 
@@ -169,17 +182,38 @@ module assemb_matrix_engine
               nnx=0.
               nxn=0.
               do idim = 1,ndim
+                if (sgi_order_same) then 
                 ! \nabla P2.n_e.n1
-                nnx = nnx + sum( sf%sfe_funs(inod,iface, :) * sf_dev2%sdev_funs(idim, jnod, iface, :) &
-                     * sf_dev2%sdetwei(:) ) * normal(idim) 
-                ! \nabla n1.n_e.P2
-                nxn = nxn + sum( sf_dev%sdev_funs(idim, inod, iface, :) * sf%sfe_funs(jnod,iface, :) & 
-                     * sf_dev%sdetwei(:) ) * normal(idim) ! it doesn't really matter if 
-                      ! we use sf_dev%sdetwei or sf_dev2%sdetwei because they are the same
-                      ! as long as nodes are same on both sides
+                  nnx = nnx + sum( sf%sfe_funs(inod,iface, :) * sf_dev2%sdev_funs(idim, jnod, iface, :) &
+                      * sf_dev2%sdetwei(:) ) * normal(idim) 
+                  ! \nabla n1.n_e.P2
+                  nxn = nxn + sum( sf_dev%sdev_funs(idim, inod, iface, :) * sf%sfe_funs(jnod,iface, :) & 
+                      * sf_dev%sdetwei(:) ) * normal(idim) ! it doesn't really matter if 
+                        ! we use sf_dev%sdetwei or sf_dev2%sdetwei because they are the same
+                        ! as long as nodes are same on both sides
+                else
+                  do gi = 1,nsgi
+                    ! \nabla P2.n_e.n1
+                    nnx = nnx + sf%sfe_funs(inod,iface,gi) * sf_dev2%sdev_funs(idim, jnod, iface2, nsgi+1 - gi) &
+                        * sf_dev2%sdetwei(nsgi+1-gi) * normal(idim)
+                    ! \nabla n1.n_e.P2
+                    nxn = nxn + sf_dev%sdev_funs(idim, inod, iface, gi) * sf%sfe_funs(jnod,iface2, nsgi+1 - gi) & 
+                        * sf_dev%sdetwei(gi)  * normal(idim)
+                  enddo
+                endif
               enddo
               ! P2.n1
-              nn = sum( sf%sfe_funs(inod,iface, :) * sf%sfe_funs(jnod,iface, :) * sf_dev2%sdetwei(:) )
+              if (sgi_order_same) then
+                nn = sum( sf%sfe_funs(inod,iface, :) * sf%sfe_funs(jnod,iface2, :) * sf_dev2%sdetwei(:) )
+                  ! TODO - suspicious. Do we need to identify which nodes correspond to which on the other side?
+                  ! Seems we do! Or the golbi and globj won't be right!.
+                  ! unless we don't use this nn surface term!
+              else
+                nn = 0.
+                do gi = 1,nsgi 
+                  nn = nn + sf%sfe_funs(inod,iface,gi) * sf%sfe_funs(jnod,iface2,nsgi+1-gi) * sf_dev2%sdetwei(nsgi+1-gi)
+                enddo
+              endif
               bigm(glob_i, glob_j) = bigm(glob_i, glob_j) &
                 - 0.5 *nnx - 0.5 * epsilon * nxn & 
                 - sigma/(elength**beta) * nn 
@@ -193,15 +227,34 @@ module assemb_matrix_engine
               nnx=0.
               nxn=0.
               do idim = 1,ndim
-                ! \nabla P1.n_e.n2
-                nnx = nnx + sum( sf%sfe_funs(inod,iface, :) * sf_dev%sdev_funs(idim, jnod, iface, :) &
-                     * sf_dev%sdetwei(:) ) * normal(idim) 
-                ! \nabla n2.n_e.P1
-                nxn = nxn + sum( sf_dev2%sdev_funs(idim, inod, iface, :) * sf%sfe_funs(jnod,iface, :) & 
-                     * sf_dev2%sdetwei(:) ) * normal(idim)
+                if (sgi_order_same) then 
+                  ! \nabla P1.n_e.n2
+                  nnx = nnx + sum( sf%sfe_funs(inod,iface, :) * sf_dev%sdev_funs(idim, jnod, iface, :) &
+                      * sf_dev%sdetwei(:) ) * normal(idim) 
+                  ! \nabla n2.n_e.P1
+                  nxn = nxn + sum( sf_dev2%sdev_funs(idim, inod, iface, :) * sf%sfe_funs(jnod,iface, :) & 
+                      * sf_dev2%sdetwei(:) ) * normal(idim)
+                else
+                  do gi = 1,nsgi
+                    ! \nabla P1.n_e.n2
+                    nnx = nnx + sf%sfe_funs(inod,iface2,nsgi+1-gi) * sf_dev%sdev_funs(idim,jnod,iface,gi) &
+                        * sf_dev%sdetwei(gi) * normal(idim)
+                    ! nabla n2.n_e.P1
+                    nxn = nxn + sf_dev2%sdev_funs(idim,inod,iface2,nsgi+1-gi) * sf%sfe_funs(jnod,iface,gi) &
+                        * sf_dev2%sdetwei(nsgi+1-gi) * normal(idim)
+                  enddo 
+                endif
               enddo
-              ! P1.n2
-              nn = sum( sf%sfe_funs(inod,iface, :) * sf%sfe_funs(jnod,iface, :) * sf_dev2%sdetwei(:) )
+              if (sgi_order_same) then 
+                ! P1.n2
+                nn = sum( sf%sfe_funs(inod,iface, :) * sf%sfe_funs(jnod,iface, :) * sf_dev2%sdetwei(:) )
+              else
+                nn = 0.
+                do gi = 1,nsgi 
+                  ! P1.n2
+                  nn = nn + sf%sfe_funs(inod,iface2,nsgi+1-gi) * sf%sfe_funs(jnod,iface,gi) * sf_dev2%sdetwei(nsgi+1-gi)
+                enddo
+              endif
               bigm(glob_i, glob_j) = bigm(glob_i, glob_j) &
                 + 0.5 *nnx + 0.5 * epsilon * nxn & 
                 - sigma/(elength**beta) * nn 
@@ -231,7 +284,7 @@ module assemb_matrix_engine
                 - nnx + epsilon * nxn & 
                 - sigma/(elength**beta) * nn 
               ! right hand side -- boundary condition
-              rhs(glob_i) = rhs(glob_i) + epsilon *nnx + sigma/elength**beta*nn &
+              rhs(glob_i) = rhs(glob_i) + epsilon *nxn + sigma/elength**beta*nn &
                 * g_D( meshvertex(glob_j)%coor(1), meshvertex(glob_j)%coor(2) )
             enddo
           enddo
@@ -278,8 +331,8 @@ module assemb_matrix_engine
 
   real function g_D(x,y) result(g)
     real, intent(in):: x, y
-    ! g = exp(-x-y**2) ! for f1
+    g = exp(-x-y**2) ! for f1
     ! g = x*(x-1)*y*(y-1)*exp(-x**2-y**2) ! for f2
-    g =1. ! for f3
+    ! g =1. ! for f3
   end function
 end module
