@@ -75,7 +75,7 @@ module assemb_matrix_engine
           ! (as used in Rivere's book), but instead we use a shape function interpolation.
           ! this is because practically we will only give right hand side f value on each 
           ! node.
-          rhs(glob_i) = rhs(glob_i) + nn * f1( meshvertex(glob_j)%coor(1) , meshvertex(glob_j)%coor(2) )
+          rhs(glob_i) = rhs(glob_i) + nn * f3( meshvertex(glob_j)%coor(1) , meshvertex(glob_j)%coor(2) )
           ! print*, 'ele, inod, rhs, f1', ele, inod, rhs(glob_i), f1( meshvertex(glob_j)%coor(1) , meshvertex(glob_j)%coor(2) )
         enddo
       enddo
@@ -91,11 +91,13 @@ module assemb_matrix_engine
           ele2 = meshface(glob_iface)%neighbor(2)
           ! face info on the other side
           iface2 = meshface(glob_iface)%nb_iface
-          glob_iface2 = meshele(ele)%face(iface2)
+          glob_iface2 = meshele(ele2)%face(iface2)
+          ! print*, glob_iface2
           ! are gaussian point distribution in same order for two sides?
           sgi_order_same = all(meshvertex(meshface(glob_iface)%vertex(1))%coor & 
               .eq. meshvertex(meshface(glob_iface2)%vertex(1))%coor) 
-          ! print*, 'ele', ele, 'glob_iface', glob_iface, 'ele2',  ele2
+          ! print*, meshvertex(meshface(glob_iface)%vertex(1))%coor, meshvertex(meshface(glob_iface2)%vertex(1))%coor
+          ! print*, 'ele', ele, 'iface', iface, 'ele2',  ele2, 'iface2', iface2, 'sgiorder?', sgi_order_same
           call calc_local_shape_func(sf_dev2, sf, meshele(ele2), meshvertex)
           ! calculate derivatives @ edges (suspicious! watch out TODO)
           call calc_local_surf_sf(sf_dev, sf, meshface(glob_iface), meshvertex)
@@ -174,7 +176,7 @@ module assemb_matrix_engine
           ! now surface term across elements.
           ! in m12 and m21 we need neighbouring face local index (iface2) to correctly use sf%sfe_funs.
           ! we also need to know if gaussian points distribution is the same on both sides (sgi_order_same)
-          ! contribution m12
+          ! contribution m12 (P2 n1)
           do inod = 1,nloc
             glob_i = (ele-1)*3 + inod 
             do jnod = 1,nloc
@@ -199,6 +201,9 @@ module assemb_matrix_engine
                     ! \nabla n1.n_e.P2
                     nxn = nxn + sf_dev%sdev_funs(idim, inod, iface, gi) * sf%sfe_funs(jnod,iface2, nsgi+1 - gi) & 
                         * sf_dev%sdetwei(gi)  * normal(idim)
+                    ! print*, 'ele', ele, 'iface', iface, 'inod', inod, 'jnod',jnod, 'idim', idim, 'gi', gi, & 
+                    !     'sf1', sf%sfe_funs(inod,iface,gi), 'sfdev2', sf_dev2%sdev_funs(idim, jnod, iface2, nsgi+1-gi), &
+                    !     'detwei1&2', sf_dev2%sdetwei, 'normal', normal
                   enddo
                 endif
               enddo
@@ -331,8 +336,8 @@ module assemb_matrix_engine
 
   real function g_D(x,y) result(g)
     real, intent(in):: x, y
-    g = exp(-x-y**2) ! for f1
+    ! g = exp(-x-y**2) ! for f1
     ! g = x*(x-1)*y*(y-1)*exp(-x**2-y**2) ! for f2
-    ! g =1. ! for f3
+    g =0. ! for f3
   end function
 end module
